@@ -71,15 +71,52 @@ const MusicPlayer = () => {
   const songSlider = useRef(null); //flatlist reference
 
   //   changing the track on complete
-  useTrackPlayerEvents([Event.PlaybackTrackChanged], async event => {
-    if (event.type === Event.PlaybackTrackChanged && event.nextTrack !== null) {
-      const track = await TrackPlayer.getTrack(event.nextTrack);
-      const {title, artwork, artist} = track;
-      setTrackTitle(title);
-      setTrackArtist(artist);
-      setTrackArtwork(artwork);
+  useTrackPlayerEvents(
+    [Event.PlaybackTrackChanged, Event.PlaybackProgressUpdated],
+    async event => {
+      if (
+        event.type === Event.PlaybackTrackChanged &&
+        event.nextTrack !== null
+      ) {
+        const track = await TrackPlayer.getTrack(event.nextTrack);
+        const {title, artwork, artist} = track;
+        setTrackTitle(title);
+        setTrackArtist(artist);
+        setTrackArtwork(artwork);
+      }
+
+      const {position, track} = event;
+      // @android-fix
+      if (!track && position === 0) {
+        console.log(
+          'Skipping first queue ended event that happens in Android',
+          event,
+        );
+        await TrackPlayer.pause();
+        return;
+      }
+
+      if (progress.position > progress.duration) {
+        // TrackPlayer.stop();
+        console.log('stop');
+        return;
+      }
+    },
+  );
+
+  const stopPlay = async () => {
+    await TrackPlayer.pause();
+    await TrackPlayer.seekTo(0);
+  };
+
+  useEffect(() => {
+    if (
+      songIndex + 1 == songs.length &&
+      progress.position + 2 > progress.duration
+    ) {
+      stopPlay();
     }
-  });
+  }, [progress.position]);
 
   const skipTo = async trackId => {
     await TrackPlayer.skip(trackId);
@@ -94,7 +131,7 @@ const MusicPlayer = () => {
     });
     return () => {
       scrollX.removeAllListeners();
-      TrackPlayer.destroy();
+      // TrackPlayer.destroy();
     };
   }, []);
 
